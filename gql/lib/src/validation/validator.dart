@@ -3,8 +3,10 @@ import "package:gql/src/validation/rules/lone_schema_definition.dart";
 import "package:gql/src/validation/rules/unique_directive_names.dart";
 import "package:gql/src/validation/rules/unique_enum_value_names.dart";
 import "package:gql/src/validation/rules/unique_field_definition_names.dart";
+import "package:gql/src/validation/rules/unique_input_field_names.dart";
 import "package:gql/src/validation/rules/unique_operation_types.dart";
 import "package:gql/src/validation/rules/unique_type_names.dart";
+import "package:gql/src/validation/rules/unique_argument_names.dart";
 import "package:gql/src/validation/validating_visitor.dart";
 import "package:meta/meta.dart";
 
@@ -19,7 +21,8 @@ List<ValidationError> validateSchema(
       ValidationRule.uniqueEnumValueNames,
       ValidationRule.loneSchemaDefinition,
       ValidationRule.uniqueOperationTypes,
-      ValidationRule.uniqueTypeNames
+      ValidationRule.uniqueTypeNames,
+      ValidationRule.uniqueArgumentNames
     },
   );
 
@@ -75,8 +78,8 @@ List<ValidationError> validateRequest(
 /// A base class for validation errors
 @immutable
 abstract class ValidationError {
-  final String message;
-  final ast.Node node;
+  final String? message;
+  final ast.Node? node;
 
   const ValidationError({
     this.message,
@@ -91,10 +94,12 @@ enum ValidationRule {
   uniqueEnumValueNames,
   loneSchemaDefinition,
   uniqueOperationTypes,
-  uniqueTypeNames
+  uniqueTypeNames,
+  uniqueInputFieldNames,
+  uniqueArgumentNames
 }
 
-ValidatingVisitor _mapRule(ValidationRule rule) {
+ValidatingVisitor? _mapRule(ValidationRule rule) {
   switch (rule) {
     case ValidationRule.uniqueDirectiveNames:
       return UniqueDirectiveNames();
@@ -108,6 +113,10 @@ ValidatingVisitor _mapRule(ValidationRule rule) {
       return UniqueOperationTypes();
     case ValidationRule.uniqueTypeNames:
       return UniqueTypeNames();
+    case ValidationRule.uniqueInputFieldNames:
+      return UniqueInputFieldNames();
+    case ValidationRule.uniqueArgumentNames:
+      return UniqueArgumentNames();
     default:
       return null;
   }
@@ -117,14 +126,18 @@ class _Validator {
   Set<ValidationRule> rules;
 
   _Validator({
-    this.rules,
+    this.rules = const {},
   });
 
   List<ValidationError> validate({
-    ast.Node node,
+    required ast.Node node,
   }) {
     final visitor = ast.AccumulatingVisitor<ValidationError>(
-      visitors: rules.map(_mapRule).toList(),
+      visitors: rules
+          .map(_mapRule)
+          .where((e) => e != null)
+          .cast<ValidatingVisitor>()
+          .toList(),
     );
 
     node.accept(visitor);

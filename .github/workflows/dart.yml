@@ -2,312 +2,224 @@ name: Dart
 on: pull_request
 
 jobs:
-  gql:
+  packages:
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - gql
+          - gql_build
+          - gql_code_builder
+          - gql_exec
+          - gql_link
+          - gql_dedupe_link
+          - gql_dio_link
+          - gql_error_link
+          - gql_http_link
+          - gql_websocket_link
+          - gql_transform_link
+          - cats
     runs-on: ubuntu-latest
     container:
-      image: google/dart:latest
-    name: Check gql
+      image: google/dart
+    name: Check ${{ matrix.package }}
     env:
-      PACKAGE: gql
+      PACKAGE: ${{ matrix.package }}
     steps:
       - name: Clone repository
         uses: actions/checkout@v2
-      - name: Override Pubspec
+      - name: Activate multipack
         run: |
-          cd ./multipack
-          pub get
-          cd ../
-          dart ./multipack/bin/main.dart pubspec hard_override
-      - name: Dart analyzer
+          echo "$HOME/.pub-cache/bin" >> $GITHUB_PATH
+          pub global activate multipack
+      - name: Check pubspec
         run: |
-          cd $PACKAGE
-          pub get
-          dartanalyzer --version
-          dartanalyzer --fatal-warnings --no-hints .
-      - name: Pana analysis
-        uses: axel-op/dart-package-analyzer@stable
-        with:
-          githubToken: ${{ secrets.GITHUB_TOKEN }}
-          relativePath: gql/
-          minAnnotationLevel: warning
+          multipack --only $PACKAGE pubspec clean
+          multipack --only $PACKAGE exec git diff --exit-code pubspec.yaml
+      - name: Override local dependencies
+        run: |
+          multipack pubspec hard_override
+      - name: Get dependencies
+        run: |
+          multipack --only $PACKAGE pub get
+      - name: Check formatting
+        run: |
+          echo ""
+          echo "A list of incorrectly formatted files may follow:"
+          echo ""
+          multipack --only $PACKAGE fmt -n . --set-exit-if-changed
+          echo ""
+      - name: Run build_runner if necessary
+        run: |
+          multipack --only $PACKAGE pub run \
+            build_runner build --delete-conflicting-outputs || true
+      - name: Analyze package
+        run: |
+          multipack --only $PACKAGE analyze --version
+          multipack --only $PACKAGE analyze --fatal-warnings --no-hints .
       - name: Run tests
-        uses: ./.github/actions/dart-test
+        run: |
+          multipack --only $PACKAGE exec [ -d ./test ] || exit 0
+          multipack --only $PACKAGE pub run test
+  examples:
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - gql_example_cli
+          - gql_example_cli_github
+          - gql_example_build
+          - gql_example_http_auth_link
+          - gql_example_dio_link
+          # gql_example_flutter would require flutter
+    runs-on: ubuntu-latest
+    container:
+      image: google/dart
+    name: Check ${{ matrix.package }}
+    env:
+      PACKAGE: ${{ matrix.package }}
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v2
+      - name: Activate multipack
+        run: |
+          echo "$HOME/.pub-cache/bin" >> $GITHUB_PATH
+          pub global activate multipack
+      - name: Check pubspec
+        run: |
+          multipack --only $PACKAGE pubspec clean
+          multipack --only $PACKAGE exec git diff --exit-code pubspec.yaml
+      - name: Override local dependencies
+        run: |
+          multipack pubspec hard_override
+      - name: Get dependencies
+        run: |
+          multipack --only $PACKAGE pub get
+      - name: Run builders
+        run: |
+          multipack --only $PACKAGE pub run \
+            build_runner build --delete-conflicting-outputs || true
+      - name: Check build diff
+        run: |
+          multipack --only $PACKAGE exec git diff --exit-code **/*.gql.dart
+      - name: Check formatting
+        run: |
+          echo ""
+          echo "A list of incorrectly formatted files may follow:"
+          echo ""
+          multipack --only $PACKAGE fmt -n . --set-exit-if-changed
+          echo ""
+      - name: Analyze package
+        run: |
+          multipack --only $PACKAGE analyze --version
+          multipack --only $PACKAGE analyze --fatal-warnings --no-hints .
+  builder_tests:
+    strategy:
+      matrix:
+        package:
+          - end_to_end_test
+    runs-on: ubuntu-latest
+    container:
+      image: google/dart
+    name: Check ${{ matrix.package }}
+    env:
+      PACKAGE: ${{ matrix.package }}
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v2
+      - name: Activate multipack
+        run: |
+          echo "$HOME/.pub-cache/bin" >> $GITHUB_PATH
+          pub global activate multipack
+      - name: Check pubspec
+        run: |
+          multipack --only $PACKAGE pubspec clean
+          multipack --only $PACKAGE exec git diff --exit-code pubspec.yaml
+      - name: Override local dependencies
+        run: |
+          multipack pubspec hard_override
+      - name: Get dependencies
+        run: |
+          multipack --only $PACKAGE pub get
+      - name: Run builders
+        run: |
+          multipack --only $PACKAGE pub run build_runner build --delete-conflicting-outputs
+      - name: Check build diff
+        run: |
+          multipack --only $PACKAGE exec git diff --exit-code **/*.gql.dart
+      - name: Check formatting
+        run: |
+          echo ""
+          echo "A list of incorrectly formatted files may follow:"
+          echo ""
+          multipack --only $PACKAGE fmt -n . --set-exit-if-changed
+          echo ""
+      - name: Analyze package
+        run: |
+          multipack --only $PACKAGE analyze --version
+          multipack --only $PACKAGE analyze --fatal-warnings --no-hints .
+      - name: Run tests
+        run: |
+          multipack --only $PACKAGE exec [ -d ./test ] || exit 0
+          multipack --only $PACKAGE pub run test
 
-  cats:
+  publish_dry_run:
     runs-on: ubuntu-latest
     container:
-      image: google/dart:latest
-    name: Check cats
+      image: google/dart
     env:
-      PACKAGE: cats
+      PACKAGES: 'gql,gql_build,gql_code_builder,gql_dedupe_link,gql_dio_link,gql_exec,gql_http_link,gql_link,gql_pedantic,gql_transform_link,gql_error_link,gql_websocket_link'
+      PUB_ACCESS_TOKEN: ${{ secrets.PUB_ACCESS_TOKEN }}
+      PUB_REFRESH_TOKEN: ${{ secrets.PUB_REFRESH_TOKEN }}
     steps:
       - name: Clone repository
         uses: actions/checkout@v2
-      - name: Override Pubspec
+      - name: Activate multipack
         run: |
-          cd ./multipack
-          pub get
-          cd ../
-          dart ./multipack/bin/main.dart pubspec hard_override
-      - name: Dart analyzer
+          echo "$HOME/.pub-cache/bin" >> $GITHUB_PATH
+          pub global activate multipack
+      - name: Bump to alpha version
         run: |
-          cd $PACKAGE
-          pub get
-          dartanalyzer --version
-          dartanalyzer --fatal-warnings --no-hints .
-#      - name: Pana analysis
-#        uses: axel-op/dart-package-analyzer@stable
-#        with:
-#          githubToken: ${{ secrets.GITHUB_TOKEN }}
-#          relativePath: cats/
-#          minAnnotationLevel: warning
-      - name: Run tests
-        uses: ./.github/actions/dart-test
+          multipack --only $PACKAGES pubspec bump-alpha
+      - name: Sync package versions
+        run: |
+          multipack --only $PACKAGES pubspec sync-versions
+      - name: Publish packages
+        shell: bash
+        continue-on-error: true
+        run: |
+          echo "{\"accessToken\":\"$PUB_ACCESS_TOKEN\",\"refreshToken\":\"$PUB_REFRESH_TOKEN\",\"idToken\":null,\"tokenEndpoint\":\"https://accounts.google.com/o/oauth2/token\",\"scopes\":[\"openid\",\"https://www.googleapis.com/auth/userinfo.email\"],\"expiration\":1588334512218}" > $HOME/.pub-cache/credentials.json
 
-  gql_build:
-    runs-on: ubuntu-latest
-    container:
-      image: google/dart:latest
-    name: Check gql_build
-    env:
-      PACKAGE: gql_build
-    steps:
-      - name: Clone repository
-        uses: actions/checkout@v2
-      - name: Override Pubspec
-        run: |
-          cd ./multipack
-          pub get
-          cd ../
-          dart ./multipack/bin/main.dart pubspec hard_override
-      - name: Dart analyzer
-        run: |
-          cd $PACKAGE
-          pub get
-          dartanalyzer --version
-          dartanalyzer --fatal-warnings --no-hints .
-      - name: Pana analysis
-        uses: axel-op/dart-package-analyzer@stable
-        with:
-          githubToken: ${{ secrets.GITHUB_TOKEN }}
-          relativePath: gql_build/
-          minAnnotationLevel: warning
-      - name: Run tests
-        uses: ./.github/actions/dart-test
+          ## BEGIN TEMPORARY WORKAROUND FOR https://github.com/google/built_value.dart/issues/1032
+          ## See dry_run_workaround_helpers.sh for more details
+          source .github/workflows/dry_run_workaround_helpers.sh
 
-  gql_code_builder:
-    runs-on: ubuntu-latest
-    container:
-      image: google/dart:latest
-    name: Check gql_code_builder
-    env:
-      PACKAGE: gql_code_builder
-    steps:
-      - name: Clone repository
-        uses: actions/checkout@v2
-      - name: Override Pubspec
-        run: |
-          cd ./multipack
-          pub get
-          cd ../
-          dart ./multipack/bin/main.dart pubspec hard_override
-      - name: Dart analyzer
-        run: |
-          cd $PACKAGE
-          pub get
-          dartanalyzer --version
-          dartanalyzer --fatal-warnings --no-hints .
-      - name: Pana analysis
-        uses: axel-op/dart-package-analyzer@stable
-        with:
-          githubToken: ${{ secrets.GITHUB_TOKEN }}
-          relativePath: gql_code_builder/
-          minAnnotationLevel: warning
-      - name: Run tests
-        uses: ./.github/actions/dart-test
+          multipack --only $PACKAGES exec 'pub publish --dry-run 2>&1' | cap
 
-  gql_dedupe_link:
-    runs-on: ubuntu-latest
-    container:
-      image: google/dart:latest
-    name: Check gql_dedupe_link
-    env:
-      PACKAGE: gql_dedupe_link
-    steps:
-      - name: Clone repository
-        uses: actions/checkout@v2
-      - name: Override Pubspec
-        run: |
-          cd ./multipack
-          pub get
-          cd ../
-          dart ./multipack/bin/main.dart pubspec hard_override
-      - name: Dart analyzer
-        run: |
-          cd $PACKAGE
-          pub get
-          dartanalyzer --version
-          dartanalyzer --fatal-warnings --no-hints .
-      - name: Pana analysis
-        uses: axel-op/dart-package-analyzer@stable
-        with:
-          githubToken: ${{ secrets.GITHUB_TOKEN }}
-          relativePath: gql_dedupe_link/
-          minAnnotationLevel: warning
-      - name: Run tests
-        uses: ./.github/actions/dart-test
+          ignore_err_when_stdout_contains \
+            'Publishing gql_build' \
+            'Package has 1 warning' \
+            'package:built_value_generator/built_value_generator.dart is opting out of null safety' \
 
-  gql_http_link:
+  check_svg:
     runs-on: ubuntu-latest
     container:
-      image: google/dart:latest
-    name: Check gql_http_link
-    env:
-      PACKAGE: gql_http_link
+      image: google/dart
     steps:
       - name: Clone repository
         uses: actions/checkout@v2
-      - name: Override Pubspec
+      - name: Install GraphViz
         run: |
-          cd ./multipack
-          pub get
-          cd ../
-          dart ./multipack/bin/main.dart pubspec hard_override
-      - name: Dart analyzer
+          apt update
+          apt install -y graphviz
+      - name: Activate multipack
         run: |
-          cd $PACKAGE
-          pub get
-          dartanalyzer --version
-          dartanalyzer --fatal-warnings --no-hints --verbose .
-      - name: Pana analysis
-        uses: axel-op/dart-package-analyzer@stable
-        with:
-          githubToken: ${{ secrets.GITHUB_TOKEN }}
-          relativePath: gql_http_link/
-          minAnnotationLevel: warning
-      - name: Run tests
-        uses: ./.github/actions/dart-test
-
-  gql_link:
-    runs-on: ubuntu-latest
-    container:
-      image: google/dart:latest
-    name: Check gql_link
-    env:
-      PACKAGE: gql_link
-    steps:
-      - name: Clone repository
-        uses: actions/checkout@v2
-      - name: Override Pubspec
+          echo "$HOME/.pub-cache/bin" >> $GITHUB_PATH
+          pub global activate multipack
+      - name: Generate SVG
         run: |
-          cd ./multipack
-          pub get
-          cd ../
-          dart ./multipack/bin/main.dart pubspec hard_override
-      - name: Dart analyzer
+          multipack info | dot -Tsvg -o docs/gql.svg
+          cat docs/gql.svg
+      - name: Check changes
         run: |
-          cd $PACKAGE
-          pub get
-          dartanalyzer --version
-          dartanalyzer --fatal-warnings --no-hints .
-      - name: Pana analysis
-        uses: axel-op/dart-package-analyzer@stable
-        with:
-          githubToken: ${{ secrets.GITHUB_TOKEN }}
-          relativePath: gql_link/
-          minAnnotationLevel: warning
-      - name: Run tests
-        uses: ./.github/actions/dart-test
-
-  gql_exec:
-    runs-on: ubuntu-latest
-    container:
-      image: google/dart:latest
-    name: Check gql_exec
-    env:
-      PACKAGE: gql_exec
-    steps:
-      - name: Clone repository
-        uses: actions/checkout@v2
-      - name: Override Pubspec
-        run: |
-          cd ./multipack
-          pub get
-          cd ../
-          dart ./multipack/bin/main.dart pubspec hard_override
-      - name: Dart analyzer
-        run: |
-          cd $PACKAGE
-          pub get
-          dartanalyzer --version
-          dartanalyzer --fatal-warnings --no-hints .
-      - name: Pana analysis
-        uses: axel-op/dart-package-analyzer@stable
-        with:
-          githubToken: ${{ secrets.GITHUB_TOKEN }}
-          relativePath: gql_exec/
-          minAnnotationLevel: warning
-      - name: Run tests
-        uses: ./.github/actions/dart-test
-
-  gql_transform_link:
-    runs-on: ubuntu-latest
-    container:
-      image: google/dart:latest
-    name: Check gql_transform_link
-    env:
-      PACKAGE: gql_transform_link
-    steps:
-      - name: Clone repository
-        uses: actions/checkout@v2
-      - name: Override Pubspec
-        run: |
-          cd ./multipack
-          pub get
-          cd ../
-          dart ./multipack/bin/main.dart pubspec hard_override
-      - name: Dart analyzer
-        run: |
-          cd $PACKAGE
-          pub get
-          dartanalyzer --version
-          dartanalyzer --fatal-warnings --no-hints .
-      - name: Pana analysis
-        uses: axel-op/dart-package-analyzer@stable
-        with:
-          githubToken: ${{ secrets.GITHUB_TOKEN }}
-          relativePath: gql_transform_link/
-          minAnnotationLevel: warning
-      - name: Run tests
-        uses: ./.github/actions/dart-test
-
-  multipack:
-    runs-on: ubuntu-latest
-    container:
-      image: google/dart:latest
-    name: Check multipack
-    env:
-      PACKAGE: multipack
-    steps:
-      - name: Clone repository
-        uses: actions/checkout@v2
-      - name: Override Pubspec
-        run: |
-          cd ./multipack
-          pub get
-          cd ../
-          dart ./multipack/bin/main.dart pubspec hard_override
-      - name: Dart analyzer
-        run: |
-          cd $PACKAGE
-          pub get
-          dartanalyzer --version
-          dartanalyzer --fatal-warnings --no-hints .
-#      - name: Pana analysis
-#        uses: axel-op/dart-package-analyzer@stable
-#        with:
-#          githubToken: ${{ secrets.GITHUB_TOKEN }}
-#          relativePath: multipack/
-#          minAnnotationLevel: warning
-      - name: Run tests
-        uses: ./.github/actions/dart-test
+          git diff --exit-code docs/gql.svg

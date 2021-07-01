@@ -1,0 +1,7 @@
+# import './nested_fragment.graphql'
+
+fragment PokemonCard on Pokemon {
+  ...NestedFragment
+  maxHP
+  image
+}

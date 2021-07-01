@@ -7,13 +7,13 @@ void _visitOne<R>(
   Node node,
   Visitor<R> v,
 ) =>
-    node?.accept(v);
+    node.accept(v);
 
 void _visitAll<R>(
   List<Node> nodes,
   Visitor<R> v,
 ) =>
-    nodes?.forEach(
+    nodes.forEach(
       (node) => _visitOne(node, v),
     );
 
@@ -21,11 +21,11 @@ void _visitAll<R>(
 @immutable
 abstract class Node {
   /// [FileSpan] representing the location of the node in the [SourceFile]
-  final FileSpan span;
+  final FileSpan? span;
 
   const Node(this.span);
 
-  List<Object> get _children;
+  List<Object?> get _children;
 
   /// Lets [Visitor] [v] visit children nodes of this node.
   void visitChildren<R>(Visitor<R> v) => _children.forEach(
@@ -40,20 +40,21 @@ abstract class Node {
 
   @override
   bool operator ==(Object o) {
-    if (o is Node) {
-      if (o.runtimeType != runtimeType) return false;
+    if (identical(this, o)) return true;
+    if (o.runtimeType != runtimeType) return false;
 
-      return const DeepCollectionEquality().equals(
-        o._children,
-        _children,
-      );
-    }
-
-    return false;
+    return const ListEquality<Object?>(
+      DeepCollectionEquality(),
+    ).equals(
+      (o as Node)._children,
+      _children,
+    );
   }
 
   @override
-  int get hashCode => const DeepCollectionEquality().hash(
+  int get hashCode => const ListEquality<Object?>(
+        DeepCollectionEquality(),
+      ).hash(
         _children,
       );
 
@@ -66,9 +67,8 @@ class DocumentNode extends Node {
 
   const DocumentNode({
     this.definitions = const [],
-    FileSpan span,
-  })  : assert(definitions != null),
-        super(span);
+    FileSpan? span,
+  }) : super(span);
 
   @override
   R accept<R>(Visitor<R> v) => v.visitDocumentNode(this);
@@ -80,22 +80,11 @@ class DocumentNode extends Node {
 }
 
 abstract class DefinitionNode extends Node {
-  final NameNode name;
-
-  const DefinitionNode({
-    @required this.name,
-    FileSpan span,
-  }) : super(span);
+  const DefinitionNode(FileSpan? span) : super(span);
 }
 
 abstract class ExecutableDefinitionNode extends DefinitionNode {
-  const ExecutableDefinitionNode({
-    @required NameNode name,
-    FileSpan span,
-  }) : super(
-          name: name,
-          span: span,
-        );
+  const ExecutableDefinitionNode(FileSpan? span) : super(span);
 }
 
 /// Enumeration of all known GraphQL operation types.
@@ -128,6 +117,8 @@ enum DirectiveLocation {
 }
 
 class OperationDefinitionNode extends ExecutableDefinitionNode {
+  final NameNode? name;
+
   final OperationType type;
 
   final List<VariableDefinitionNode> variableDefinitions;
@@ -137,25 +128,19 @@ class OperationDefinitionNode extends ExecutableDefinitionNode {
   final SelectionSetNode selectionSet;
 
   const OperationDefinitionNode({
-    @required this.type,
-    NameNode name,
+    required this.type,
+    this.name,
     this.variableDefinitions = const [],
     this.directives = const [],
-    @required this.selectionSet,
-    FileSpan span,
-  })  : assert(variableDefinitions != null),
-        assert(directives != null),
-        assert(selectionSet != null),
-        super(
-          name: name,
-          span: span,
-        );
+    required this.selectionSet,
+    FileSpan? span,
+  }) : super(span);
 
   @override
   R accept<R>(Visitor<R> v) => v.visitOperationDefinitionNode(this);
 
   @override
-  List<Object> get _children => <Object>[
+  List<Object?> get _children => <Object?>[
         name,
         type,
         selectionSet,
@@ -169,7 +154,7 @@ class SelectionSetNode extends Node {
 
   const SelectionSetNode({
     this.selections = const [],
-    FileSpan span,
+    FileSpan? span,
   }) : super(span);
 
   @override
@@ -182,11 +167,11 @@ class SelectionSetNode extends Node {
 }
 
 abstract class SelectionNode extends Node {
-  const SelectionNode(FileSpan span) : super(span);
+  const SelectionNode(FileSpan? span) : super(span);
 }
 
 class FieldNode extends SelectionNode {
-  final NameNode alias;
+  final NameNode? alias;
 
   final NameNode name;
 
@@ -194,25 +179,22 @@ class FieldNode extends SelectionNode {
 
   final List<DirectiveNode> directives;
 
-  final SelectionSetNode selectionSet;
+  final SelectionSetNode? selectionSet;
 
   const FieldNode({
     this.alias,
-    @required this.name,
+    required this.name,
     this.arguments = const [],
     this.directives = const [],
     this.selectionSet,
-    FileSpan span,
-  })  : assert(name != null),
-        assert(arguments != null),
-        assert(directives != null),
-        super(span);
+    FileSpan? span,
+  }) : super(span);
 
   @override
   R accept<R>(Visitor<R> v) => v.visitFieldNode(this);
 
   @override
-  List<Object> get _children => <Object>[
+  List<Object?> get _children => <Object?>[
         alias,
         name,
         selectionSet,
@@ -227,12 +209,10 @@ class ArgumentNode extends Node {
   final ValueNode value;
 
   const ArgumentNode({
-    @required this.name,
-    @required this.value,
-    FileSpan span,
-  })  : assert(name != null),
-        assert(value != null),
-        super(span);
+    required this.name,
+    required this.value,
+    FileSpan? span,
+  }) : super(span);
 
   @override
   R accept<R>(Visitor<R> v) => v.visitArgumentNode(this);
@@ -250,12 +230,10 @@ class FragmentSpreadNode extends SelectionNode {
   final List<DirectiveNode> directives;
 
   const FragmentSpreadNode({
-    @required this.name,
+    required this.name,
     this.directives = const [],
-    FileSpan span,
-  })  : assert(name != null),
-        assert(directives != null),
-        super(span);
+    FileSpan? span,
+  }) : super(span);
 
   @override
   R accept<R>(Visitor<R> v) => v.visitFragmentSpreadNode(this);
@@ -268,7 +246,7 @@ class FragmentSpreadNode extends SelectionNode {
 }
 
 class InlineFragmentNode extends SelectionNode {
-  final TypeConditionNode typeCondition;
+  final TypeConditionNode? typeCondition;
 
   final List<DirectiveNode> directives;
 
@@ -277,17 +255,15 @@ class InlineFragmentNode extends SelectionNode {
   const InlineFragmentNode({
     this.typeCondition,
     this.directives = const [],
-    @required this.selectionSet,
-    FileSpan span,
-  })  : assert(directives != null),
-        assert(selectionSet != null),
-        super(span);
+    required this.selectionSet,
+    FileSpan? span,
+  }) : super(span);
 
   @override
   R accept<R>(Visitor<R> v) => v.visitInlineFragmentNode(this);
 
   @override
-  List<Object> get _children => <Object>[
+  List<Object?> get _children => <Object?>[
         typeCondition,
         selectionSet,
         directives,
@@ -295,6 +271,8 @@ class InlineFragmentNode extends SelectionNode {
 }
 
 class FragmentDefinitionNode extends ExecutableDefinitionNode {
+  final NameNode name;
+
   final TypeConditionNode typeCondition;
 
   final List<DirectiveNode> directives;
@@ -302,25 +280,18 @@ class FragmentDefinitionNode extends ExecutableDefinitionNode {
   final SelectionSetNode selectionSet;
 
   const FragmentDefinitionNode({
-    @required NameNode name,
-    @required this.typeCondition,
+    required this.name,
+    required this.typeCondition,
     this.directives = const [],
-    @required this.selectionSet,
-    FileSpan span,
-  })  : assert(name != null),
-        assert(typeCondition != null),
-        assert(directives != null),
-        assert(selectionSet != null),
-        super(
-          name: name,
-          span: span,
-        );
+    required this.selectionSet,
+    FileSpan? span,
+  }) : super(span);
 
   @override
   R accept<R>(Visitor<R> v) => v.visitFragmentDefinitionNode(this);
 
   @override
-  List<Object> get _children => <Object>[
+  List<Object?> get _children => <Object?>[
         name,
         typeCondition,
         selectionSet,
@@ -332,10 +303,9 @@ class TypeConditionNode extends Node {
   final NamedTypeNode on;
 
   const TypeConditionNode({
-    @required this.on,
-    FileSpan span,
-  })  : assert(on != null),
-        super(span);
+    required this.on,
+    FileSpan? span,
+  }) : super(span);
 
   @override
   R accept<R>(Visitor<R> v) => v.visitTypeConditionNode(this);
@@ -347,17 +317,16 @@ class TypeConditionNode extends Node {
 }
 
 abstract class ValueNode extends Node {
-  const ValueNode(FileSpan span) : super(span);
+  const ValueNode(FileSpan? span) : super(span);
 }
 
 class VariableNode extends ValueNode {
   final NameNode name;
 
   const VariableNode({
-    @required this.name,
-    FileSpan span,
-  })  : assert(name != null),
-        super(span);
+    required this.name,
+    FileSpan? span,
+  }) : super(span);
 
   @override
   R accept<R>(Visitor<R> v) => v.visitVariableNode(this);
@@ -372,10 +341,9 @@ class IntValueNode extends ValueNode {
   final String value;
 
   const IntValueNode({
-    @required this.value,
-    FileSpan span,
-  })  : assert(value != null),
-        super(span);
+    required this.value,
+    FileSpan? span,
+  }) : super(span);
 
   @override
   R accept<R>(Visitor<R> v) => v.visitIntValueNode(this);
@@ -390,10 +358,9 @@ class FloatValueNode extends ValueNode {
   final String value;
 
   const FloatValueNode({
-    @required this.value,
-    FileSpan span,
-  })  : assert(value != null),
-        super(span);
+    required this.value,
+    FileSpan? span,
+  }) : super(span);
 
   @override
   R accept<R>(Visitor<R> v) => v.visitFloatValueNode(this);
@@ -410,12 +377,10 @@ class StringValueNode extends ValueNode {
   final bool isBlock;
 
   const StringValueNode({
-    @required this.value,
-    @required this.isBlock,
-    FileSpan span,
-  })  : assert(value != null),
-        assert(isBlock != null),
-        super(span);
+    required this.value,
+    required this.isBlock,
+    FileSpan? span,
+  }) : super(span);
 
   @override
   R accept<R>(Visitor<R> v) => v.visitStringValueNode(this);
@@ -431,10 +396,9 @@ class BooleanValueNode extends ValueNode {
   final bool value;
 
   const BooleanValueNode({
-    @required this.value,
-    FileSpan span,
-  })  : assert(value != null),
-        super(span);
+    required this.value,
+    FileSpan? span,
+  }) : super(span);
 
   @override
   R accept<R>(Visitor<R> v) => v.visitBooleanValueNode(this);
@@ -447,7 +411,7 @@ class BooleanValueNode extends ValueNode {
 
 class NullValueNode extends ValueNode {
   const NullValueNode({
-    FileSpan span,
+    FileSpan? span,
   }) : super(span);
 
   @override
@@ -461,10 +425,9 @@ class EnumValueNode extends ValueNode {
   final NameNode name;
 
   const EnumValueNode({
-    @required this.name,
-    FileSpan span,
-  })  : assert(name != null),
-        super(span);
+    required this.name,
+    FileSpan? span,
+  }) : super(span);
 
   @override
   R accept<R>(Visitor<R> v) => v.visitEnumValueNode(this);
@@ -480,7 +443,7 @@ class ListValueNode extends ValueNode {
 
   const ListValueNode({
     this.values = const [],
-    FileSpan span,
+    FileSpan? span,
   }) : super(span);
 
   @override
@@ -497,7 +460,7 @@ class ObjectValueNode extends ValueNode {
 
   const ObjectValueNode({
     this.fields = const [],
-    FileSpan span,
+    FileSpan? span,
   }) : super(span);
 
   @override
@@ -515,12 +478,10 @@ class ObjectFieldNode extends Node {
   final ValueNode value;
 
   const ObjectFieldNode({
-    @required this.name,
-    @required this.value,
-    FileSpan span,
-  })  : assert(name != null),
-        assert(value != null),
-        super(span);
+    required this.name,
+    required this.value,
+    FileSpan? span,
+  }) : super(span);
 
   @override
   R accept<R>(Visitor<R> v) => v.visitObjectFieldNode(this);
@@ -537,26 +498,23 @@ class VariableDefinitionNode extends Node {
 
   final TypeNode type;
 
-  final DefaultValueNode defaultValue;
+  final DefaultValueNode? defaultValue;
 
   final List<DirectiveNode> directives;
 
   const VariableDefinitionNode({
-    @required this.variable,
-    @required this.type,
+    required this.variable,
+    required this.type,
     this.defaultValue,
     this.directives = const [],
-    FileSpan span,
-  })  : assert(variable != null),
-        assert(type != null),
-        assert(directives != null),
-        super(span);
+    FileSpan? span,
+  }) : super(span);
 
   @override
   R accept<R>(Visitor<R> v) => v.visitVariableDefinitionNode(this);
 
   @override
-  List<Object> get _children => <Object>[
+  List<Object?> get _children => <Object?>[
         variable,
         type,
         defaultValue,
@@ -565,18 +523,18 @@ class VariableDefinitionNode extends Node {
 }
 
 class DefaultValueNode extends Node {
-  final ValueNode value;
+  final ValueNode? value;
 
   const DefaultValueNode({
-    @required this.value,
-    FileSpan span,
+    required this.value,
+    FileSpan? span,
   }) : super(span);
 
   @override
   R accept<R>(Visitor<R> v) => v.visitDefaultValueNode(this);
 
   @override
-  List<Object> get _children => <Object>[
+  List<Object?> get _children => <Object?>[
         value,
       ];
 }
@@ -584,21 +542,17 @@ class DefaultValueNode extends Node {
 abstract class TypeNode extends Node {
   final bool isNonNull;
 
-  const TypeNode(this.isNonNull, FileSpan span)
-      : assert(isNonNull != null),
-        super(span);
+  const TypeNode(this.isNonNull, FileSpan? span) : super(span);
 }
 
 class NamedTypeNode extends TypeNode {
   final NameNode name;
 
   const NamedTypeNode({
-    @required this.name,
+    required this.name,
     bool isNonNull = false,
-    FileSpan span,
-  })  : assert(name != null),
-        assert(isNonNull != null),
-        super(isNonNull, span);
+    FileSpan? span,
+  }) : super(isNonNull, span);
 
   @override
   R accept<R>(Visitor<R> v) => v.visitNamedTypeNode(this);
@@ -614,12 +568,10 @@ class ListTypeNode extends TypeNode {
   final TypeNode type;
 
   const ListTypeNode({
-    @required this.type,
-    @required bool isNonNull,
-    FileSpan span,
-  })  : assert(type != null),
-        assert(isNonNull != null),
-        super(isNonNull, span);
+    required this.type,
+    required bool isNonNull,
+    FileSpan? span,
+  }) : super(isNonNull, span);
 
   @override
   R accept<R>(Visitor<R> v) => v.visitListTypeNode(this);
@@ -637,12 +589,10 @@ class DirectiveNode extends Node {
   final List<ArgumentNode> arguments;
 
   const DirectiveNode({
-    @required this.name,
+    required this.name,
     this.arguments = const [],
-    FileSpan span,
-  })  : assert(name != null),
-        assert(arguments != null),
-        super(span);
+    FileSpan? span,
+  }) : super(span);
 
   @override
   R accept<R>(Visitor<R> v) => v.visitDirectiveNode(this);
@@ -658,10 +608,9 @@ class NameNode extends Node {
   final String value;
 
   const NameNode({
-    @required this.value,
-    FileSpan span,
-  })  : assert(value != null),
-        super(span);
+    required this.value,
+    FileSpan? span,
+  }) : super(span);
 
   @override
   R accept<R>(Visitor<R> v) => v.visitNameNode(this);
@@ -673,55 +622,37 @@ class NameNode extends Node {
 }
 
 abstract class TypeSystemDefinitionNode extends DefinitionNode {
-  const TypeSystemDefinitionNode({
-    @required NameNode name,
-    FileSpan span,
-  }) : super(
-          name: name,
-          span: span,
-        );
+  const TypeSystemDefinitionNode(FileSpan? span) : super(span);
 }
 
 abstract class TypeDefinitionNode extends TypeSystemDefinitionNode {
-  final StringValueNode description;
+  final NameNode name;
+  final StringValueNode? description;
   final List<DirectiveNode> directives;
 
   const TypeDefinitionNode({
     this.description,
-    @required NameNode name,
+    required this.name,
     this.directives = const [],
-    FileSpan span,
-  })  : assert(name != null),
-        assert(directives != null),
-        super(
-          name: name,
-          span: span,
-        );
+    FileSpan? span,
+  }) : super(span);
 }
 
 abstract class TypeSystemExtensionNode extends TypeSystemDefinitionNode {
-  const TypeSystemExtensionNode({
-    @required NameNode name,
-    FileSpan span,
-  }) : super(
-          name: name,
-          span: span,
-        );
+  const TypeSystemExtensionNode(
+    FileSpan? span,
+  ) : super(span);
 }
 
 abstract class TypeExtensionNode extends TypeSystemExtensionNode {
+  final NameNode name;
   final List<DirectiveNode> directives;
 
   const TypeExtensionNode({
-    FileSpan span,
-    @required NameNode name,
+    FileSpan? span,
+    required this.name,
     this.directives = const [],
-  })  : assert(name != null),
-        assert(directives != null),
-        super(
-          name: name,
-          span: span,
-        );
+  }) : super(span);
 }
 
 class SchemaDefinitionNode extends TypeSystemDefinitionNode {
@@ -731,13 +662,8 @@ class SchemaDefinitionNode extends TypeSystemDefinitionNode {
   const SchemaDefinitionNode({
     this.directives = const [],
     this.operationTypes = const [],
-    FileSpan span,
-  })  : assert(directives != null),
-        assert(operationTypes != null),
-        super(
-          name: null,
-          span: span,
-        );
+    FileSpan? span,
+  }) : super(span);
 
   @override
   R accept<R>(Visitor<R> v) => v.visitSchemaDefinitionNode(this);
@@ -754,12 +680,10 @@ class OperationTypeDefinitionNode extends Node {
   final NamedTypeNode type;
 
   const OperationTypeDefinitionNode({
-    @required this.operation,
-    @required this.type,
-    FileSpan span,
-  })  : assert(operation != null),
-        assert(type != null),
-        super(span);
+    required this.operation,
+    required this.type,
+    FileSpan? span,
+  }) : super(span);
 
   @override
   R accept<R>(Visitor<R> v) => v.visitOperationTypeDefinitionNode(this);
@@ -773,13 +697,11 @@ class OperationTypeDefinitionNode extends Node {
 
 class ScalarTypeDefinitionNode extends TypeDefinitionNode {
   const ScalarTypeDefinitionNode({
-    StringValueNode description,
-    @required NameNode name,
+    StringValueNode? description,
+    required NameNode name,
     List<DirectiveNode> directives = const [],
-    FileSpan span,
-  })  : assert(name != null),
-        assert(directives != null),
-        super(
+    FileSpan? span,
+  }) : super(
           span: span,
           name: name,
           description: description,
@@ -790,7 +712,7 @@ class ScalarTypeDefinitionNode extends TypeDefinitionNode {
   R accept<R>(Visitor<R> v) => v.visitScalarTypeDefinitionNode(this);
 
   @override
-  List<Object> get _children => <Object>[
+  List<Object?> get _children => <Object?>[
         name,
         description,
         directives,
@@ -804,15 +726,11 @@ class ObjectTypeDefinitionNode extends TypeDefinitionNode {
   const ObjectTypeDefinitionNode({
     this.interfaces = const [],
     this.fields = const [],
-    StringValueNode description,
-    @required NameNode name,
+    StringValueNode? description,
+    required NameNode name,
     List<DirectiveNode> directives = const [],
-    FileSpan span,
-  })  : assert(interfaces != null),
-        assert(fields != null),
-        assert(name != null),
-        assert(directives != null),
-        super(
+    FileSpan? span,
+  }) : super(
           span: span,
           name: name,
           description: description,
@@ -823,7 +741,7 @@ class ObjectTypeDefinitionNode extends TypeDefinitionNode {
   R accept<R>(Visitor<R> v) => v.visitObjectTypeDefinitionNode(this);
 
   @override
-  List<Object> get _children => <Object>[
+  List<Object?> get _children => <Object?>[
         name,
         description,
         directives,
@@ -833,7 +751,7 @@ class ObjectTypeDefinitionNode extends TypeDefinitionNode {
 }
 
 class FieldDefinitionNode extends Node {
-  final StringValueNode description;
+  final StringValueNode? description;
   final NameNode name;
   final TypeNode type;
   final List<DirectiveNode> directives;
@@ -841,22 +759,18 @@ class FieldDefinitionNode extends Node {
 
   const FieldDefinitionNode({
     this.description,
-    @required this.name,
-    @required this.type,
+    required this.name,
+    required this.type,
     this.args = const [],
     this.directives = const [],
-    FileSpan span,
-  })  : assert(type != null),
-        assert(args != null),
-        assert(name != null),
-        assert(directives != null),
-        super(span);
+    FileSpan? span,
+  }) : super(span);
 
   @override
   R accept<R>(Visitor<R> v) => v.visitFieldDefinitionNode(this);
 
   @override
-  List<Object> get _children => <Object>[
+  List<Object?> get _children => <Object?>[
         name,
         description,
         directives,
@@ -866,30 +780,26 @@ class FieldDefinitionNode extends Node {
 }
 
 class InputValueDefinitionNode extends Node {
-  final StringValueNode description;
+  final StringValueNode? description;
   final NameNode name;
   final TypeNode type;
-  final ValueNode defaultValue;
+  final ValueNode? defaultValue;
   final List<DirectiveNode> directives;
 
   const InputValueDefinitionNode({
     this.description,
-    @required this.name,
-    @required this.type,
+    required this.name,
+    required this.type,
     this.defaultValue,
     this.directives = const [],
-    FileSpan span,
-  })  : assert(type != null),
-        assert(name != null),
-        assert(type != null),
-        assert(directives != null),
-        super(span);
+    FileSpan? span,
+  }) : super(span);
 
   @override
   R accept<R>(Visitor<R> v) => v.visitInputValueDefinitionNode(this);
 
   @override
-  List<Object> get _children => <Object>[
+  List<Object?> get _children => <Object?>[
         name,
         description,
         directives,
@@ -903,14 +813,11 @@ class InterfaceTypeDefinitionNode extends TypeDefinitionNode {
 
   const InterfaceTypeDefinitionNode({
     this.fields = const [],
-    StringValueNode description,
-    @required NameNode name,
+    StringValueNode? description,
+    required NameNode name,
     List<DirectiveNode> directives = const [],
-    FileSpan span,
-  })  : assert(fields != null),
-        assert(name != null),
-        assert(directives != null),
-        super(
+    FileSpan? span,
+  }) : super(
           span: span,
           name: name,
           description: description,
@@ -921,7 +828,7 @@ class InterfaceTypeDefinitionNode extends TypeDefinitionNode {
   R accept<R>(Visitor<R> v) => v.visitInterfaceTypeDefinitionNode(this);
 
   @override
-  List<Object> get _children => <Object>[
+  List<Object?> get _children => <Object?>[
         name,
         description,
         directives,
@@ -934,14 +841,11 @@ class UnionTypeDefinitionNode extends TypeDefinitionNode {
 
   const UnionTypeDefinitionNode({
     this.types = const [],
-    StringValueNode description,
-    @required NameNode name,
+    StringValueNode? description,
+    required NameNode name,
     List<DirectiveNode> directives = const [],
-    FileSpan span,
-  })  : assert(types != null),
-        assert(name != null),
-        assert(directives != null),
-        super(
+    FileSpan? span,
+  }) : super(
           span: span,
           name: name,
           description: description,
@@ -952,7 +856,7 @@ class UnionTypeDefinitionNode extends TypeDefinitionNode {
   R accept<R>(Visitor<R> v) => v.visitUnionTypeDefinitionNode(this);
 
   @override
-  List<Object> get _children => <Object>[
+  List<Object?> get _children => <Object?>[
         name,
         description,
         directives,
@@ -965,14 +869,11 @@ class EnumTypeDefinitionNode extends TypeDefinitionNode {
 
   const EnumTypeDefinitionNode({
     this.values = const [],
-    StringValueNode description,
-    @required NameNode name,
+    StringValueNode? description,
+    required NameNode name,
     List<DirectiveNode> directives = const [],
-    FileSpan span,
-  })  : assert(values != null),
-        assert(name != null),
-        assert(directives != null),
-        super(
+    FileSpan? span,
+  }) : super(
           span: span,
           name: name,
           description: description,
@@ -983,7 +884,7 @@ class EnumTypeDefinitionNode extends TypeDefinitionNode {
   R accept<R>(Visitor<R> v) => v.visitEnumTypeDefinitionNode(this);
 
   @override
-  List<Object> get _children => <Object>[
+  List<Object?> get _children => <Object?>[
         name,
         description,
         directives,
@@ -992,14 +893,15 @@ class EnumTypeDefinitionNode extends TypeDefinitionNode {
 }
 
 class EnumValueDefinitionNode extends TypeDefinitionNode {
+  final bool fallback;
+
   const EnumValueDefinitionNode({
-    StringValueNode description,
-    @required NameNode name,
+    StringValueNode? description,
+    required NameNode name,
     List<DirectiveNode> directives = const [],
-    FileSpan span,
-  })  : assert(name != null),
-        assert(directives != null),
-        super(
+    FileSpan? span,
+    this.fallback = false,
+  }) : super(
           span: span,
           name: name,
           description: description,
@@ -1010,7 +912,7 @@ class EnumValueDefinitionNode extends TypeDefinitionNode {
   R accept<R>(Visitor<R> v) => v.visitEnumValueDefinitionNode(this);
 
   @override
-  List<Object> get _children => <Object>[
+  List<Object?> get _children => <Object?>[
         name,
         description,
         directives,
@@ -1022,14 +924,11 @@ class InputObjectTypeDefinitionNode extends TypeDefinitionNode {
 
   const InputObjectTypeDefinitionNode({
     this.fields = const [],
-    StringValueNode description,
-    @required NameNode name,
+    StringValueNode? description,
+    required NameNode name,
     List<DirectiveNode> directives = const [],
-    FileSpan span,
-  })  : assert(fields != null),
-        assert(name != null),
-        assert(directives != null),
-        super(
+    FileSpan? span,
+  }) : super(
           span: span,
           name: name,
           description: description,
@@ -1040,7 +939,7 @@ class InputObjectTypeDefinitionNode extends TypeDefinitionNode {
   R accept<R>(Visitor<R> v) => v.visitInputObjectTypeDefinitionNode(this);
 
   @override
-  List<Object> get _children => <Object>[
+  List<Object?> get _children => <Object?>[
         name,
         description,
         directives,
@@ -1049,32 +948,26 @@ class InputObjectTypeDefinitionNode extends TypeDefinitionNode {
 }
 
 class DirectiveDefinitionNode extends TypeSystemDefinitionNode {
-  final StringValueNode description;
+  final NameNode name;
+  final StringValueNode? description;
   final List<InputValueDefinitionNode> args;
   final List<DirectiveLocation> locations;
   final bool repeatable;
 
   const DirectiveDefinitionNode({
     this.description,
-    @required NameNode name,
+    required this.name,
     this.args = const [],
     this.locations = const [],
     this.repeatable = false,
-    FileSpan span,
-  })  : assert(name != null),
-        assert(args != null),
-        assert(locations != null),
-        assert(repeatable != null),
-        super(
-          name: name,
-          span: span,
-        );
+    FileSpan? span,
+  }) : super(span);
 
   @override
   R accept<R>(Visitor<R> v) => v.visitDirectiveDefinitionNode(this);
 
   @override
-  List<Object> get _children => <Object>[
+  List<Object?> get _children => <Object?>[
         name,
         description,
         locations,
@@ -1090,20 +983,14 @@ class SchemaExtensionNode extends TypeSystemExtensionNode {
   const SchemaExtensionNode({
     this.directives = const [],
     this.operationTypes = const [],
-    FileSpan span,
-  })  : assert(directives != null),
-        assert(operationTypes != null),
-        super(
-          name: null,
-          span: span,
-        );
+    FileSpan? span,
+  }) : super(span);
 
   @override
   R accept<R>(Visitor<R> v) => v.visitSchemaExtensionNode(this);
 
   @override
-  List<Object> get _children => <Object>[
-        name,
+  List<Object?> get _children => <Object?>[
         directives,
         operationTypes,
       ];
@@ -1111,12 +998,10 @@ class SchemaExtensionNode extends TypeSystemExtensionNode {
 
 class ScalarTypeExtensionNode extends TypeExtensionNode {
   const ScalarTypeExtensionNode({
-    FileSpan span,
-    @required NameNode name,
+    FileSpan? span,
+    required NameNode name,
     List<DirectiveNode> directives = const [],
-  })  : assert(name != null),
-        assert(directives != null),
-        super(
+  }) : super(
           span: span,
           name: name,
           directives: directives,
@@ -1126,7 +1011,7 @@ class ScalarTypeExtensionNode extends TypeExtensionNode {
   R accept<R>(Visitor<R> v) => v.visitScalarTypeExtensionNode(this);
 
   @override
-  List<Object> get _children => <Object>[
+  List<Object?> get _children => <Object?>[
         name,
         directives,
       ];
@@ -1137,16 +1022,12 @@ class ObjectTypeExtensionNode extends TypeExtensionNode {
   final List<FieldDefinitionNode> fields;
 
   const ObjectTypeExtensionNode({
-    @required NameNode name,
+    required NameNode name,
     this.interfaces = const [],
     this.fields = const [],
-    FileSpan span,
+    FileSpan? span,
     List<DirectiveNode> directives = const [],
-  })  : assert(name != null),
-        assert(interfaces != null),
-        assert(fields != null),
-        assert(directives != null),
-        super(
+  }) : super(
           span: span,
           name: name,
           directives: directives,
@@ -1156,7 +1037,7 @@ class ObjectTypeExtensionNode extends TypeExtensionNode {
   R accept<R>(Visitor<R> v) => v.visitObjectTypeExtensionNode(this);
 
   @override
-  List<Object> get _children => <Object>[
+  List<Object?> get _children => <Object?>[
         name,
         directives,
         interfaces,
@@ -1169,13 +1050,10 @@ class InterfaceTypeExtensionNode extends TypeExtensionNode {
 
   const InterfaceTypeExtensionNode({
     this.fields = const [],
-    @required NameNode name,
-    FileSpan span,
+    required NameNode name,
+    FileSpan? span,
     List<DirectiveNode> directives = const [],
-  })  : assert(name != null),
-        assert(fields != null),
-        assert(directives != null),
-        super(
+  }) : super(
           span: span,
           name: name,
           directives: directives,
@@ -1185,7 +1063,7 @@ class InterfaceTypeExtensionNode extends TypeExtensionNode {
   R accept<R>(Visitor<R> v) => v.visitInterfaceTypeExtensionNode(this);
 
   @override
-  List<Object> get _children => <Object>[
+  List<Object?> get _children => <Object?>[
         name,
         directives,
         fields,
@@ -1197,13 +1075,10 @@ class UnionTypeExtensionNode extends TypeExtensionNode {
 
   const UnionTypeExtensionNode({
     this.types = const [],
-    @required NameNode name,
+    required NameNode name,
     List<DirectiveNode> directives = const [],
-    FileSpan span,
-  })  : assert(name != null),
-        assert(types != null),
-        assert(directives != null),
-        super(
+    FileSpan? span,
+  }) : super(
           span: span,
           name: name,
           directives: directives,
@@ -1213,7 +1088,7 @@ class UnionTypeExtensionNode extends TypeExtensionNode {
   R accept<R>(Visitor<R> v) => v.visitUnionTypeExtensionNode(this);
 
   @override
-  List<Object> get _children => <Object>[
+  List<Object?> get _children => <Object?>[
         name,
         directives,
         types,
@@ -1225,13 +1100,10 @@ class EnumTypeExtensionNode extends TypeExtensionNode {
 
   const EnumTypeExtensionNode({
     this.values = const [],
-    FileSpan span,
-    @required NameNode name,
+    FileSpan? span,
+    required NameNode name,
     List<DirectiveNode> directives = const [],
-  })  : assert(name != null),
-        assert(values != null),
-        assert(directives != null),
-        super(
+  }) : super(
           span: span,
           name: name,
           directives: directives,
@@ -1241,7 +1113,7 @@ class EnumTypeExtensionNode extends TypeExtensionNode {
   R accept<R>(Visitor<R> v) => v.visitEnumTypeExtensionNode(this);
 
   @override
-  List<Object> get _children => <Object>[
+  List<Object?> get _children => <Object?>[
         name,
         directives,
         values,
@@ -1253,13 +1125,10 @@ class InputObjectTypeExtensionNode extends TypeExtensionNode {
 
   const InputObjectTypeExtensionNode({
     this.fields = const [],
-    FileSpan span,
-    @required NameNode name,
+    FileSpan? span,
+    required NameNode name,
     List<DirectiveNode> directives = const [],
-  })  : assert(name != null),
-        assert(fields != null),
-        assert(directives != null),
-        super(
+  }) : super(
           span: span,
           name: name,
           directives: directives,
@@ -1269,7 +1138,7 @@ class InputObjectTypeExtensionNode extends TypeExtensionNode {
   R accept<R>(Visitor<R> v) => v.visitInputObjectTypeExtensionNode(this);
 
   @override
-  List<Object> get _children => <Object>[
+  List<Object?> get _children => <Object?>[
         name,
         directives,
         fields,
